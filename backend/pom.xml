@@ -22,6 +22,12 @@
         <mapstruct.version>1.6.2</mapstruct.version>
         <jjwt.version>0.12.6</jjwt.version>
         <lombok.version>1.18.36</lombok.version>
+        <!-- SonarQube Configuration -->
+        <sonar.projectKey>audit-platform</sonar.projectKey>
+        <sonar.projectName>Audit Platform</sonar.projectName>
+        <sonar.sources>src/main,../frontend/src</sonar.sources>
+        <sonar.exclusions>**/node_modules/**,**/target/**,**/dist/**,**/.next/**</sonar.exclusions>
+        <sonar.host.url>https://sonarcloud.io</sonar.host.url>
     </properties>
 
     <dependencies>
@@ -233,6 +239,11 @@
                         <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
                     </compilerArgs>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.sonarsource.scanner.maven</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>4.0.0.4121</version>
             </plugin>
         </plugins>
     </build>
