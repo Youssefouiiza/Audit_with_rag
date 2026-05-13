@@ -39,7 +39,7 @@ jobs:
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ 0a37c0c08e37e8ae67cdb394aae2c94fdf4a25c3 }}
           SONAR_TOKEN: ${{ 0a37c0c08e37e8ae67cdb394aae2c94fdf4a25c3 }}
         with:
           args: >
@@ -47,3 +47,4 @@ jobs:
             -Dsonar.organization=youssefouiiza
             -Dsonar.sources=backend/src/main,frontend/src
             -Dsonar.java.binaries=backend/target/classes
+            -Dsonar.host.url=https://sonarcloud.io
