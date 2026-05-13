@@ -24,7 +24,7 @@ PY_VER=$(python3 --version 2>&1)
 echo "✅ $PY_VER détecté"
 
 # ── Environnement virtuel (recommandé) ───────────────────────
-if [ ! -d "venv" ]; then
+if [[ ! -d "venv" ]]; then
     echo ""
     echo "🔧 Création d'un environnement virtuel Python..."
     python3 -m venv venv
@@ -68,7 +68,7 @@ else
 fi
 
 # ── Création du dossier data/ ─────────────────────────────────
-if [ ! -d "data" ]; then
+if [[ ! -d "data" ]]; then
     echo ""
     mkdir -p data
     echo "📁 Dossier data/ créé"
@@ -89,7 +89,7 @@ fi
 
 # ── Indexation si nécessaire ─────────────────────────────────
 echo ""
-if [ ! -d "vector_db" ]; then
+if [[ ! -d "vector_db" ]]; then
     echo "🔍 Base vectorielle introuvable — Lancement de l'indexation..."
     python 01_load_and_index.py
 else

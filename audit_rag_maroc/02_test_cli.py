@@ -106,38 +106,56 @@ def choisir_modele() -> str:
             f"[Entrée pour '{DEFAULT_MODEL}'] : {Style.RESET_ALL}"
         ).strip()
 
-        if choix == "":
+        if not choix:
             print(f"  → Modèle sélectionné : {Fore.GREEN}{DEFAULT_MODEL}")
             return DEFAULT_MODEL
 
-        try:
+        # Sélection par numéro
+        if choix.isdigit():
             index = int(choix) - 1
             if 0 <= index < len(modeles):
                 modele = modeles[index]
                 print(f"  → Modèle sélectionné : {Fore.GREEN}{AVAILABLE_MODELS[modele]['nom']}")
                 return modele
-            else:
-                print(f"{Fore.RED}  ❌ Numéro invalide. Choisissez entre 1 et {len(modeles)}.")
-        except ValueError:
-            # L'utilisateur a tapé directement le nom du modèle
-            if choix in modeles:
-                print(f"  → Modèle sélectionné : {Fore.GREEN}{AVAILABLE_MODELS[choix]['nom']}")
-                return choix
-            print(f"{Fore.RED}  ❌ Modèle inconnu. Réessayez.")
+            print(f"{Fore.RED}  ❌ Numéro invalide. Choisissez entre 1 et {len(modeles)}.")
+            continue
+
+        # Sélection par nom direct
+        if choix in modeles:
+            print(f"  → Modèle sélectionné : {Fore.GREEN}{AVAILABLE_MODELS[choix]['nom']}")
+            return choix
+
+        print(f"{Fore.RED}  ❌ Modèle inconnu. Réessayez.")
 
 
-def choisir_question() -> str:
-    """Affiche les questions de test et demande un choix."""
+def afficher_questions():
+    """Affiche la liste des questions de test disponibles."""
     print(f"\n{Fore.CYAN}📋 QUESTIONS DE TEST PRÉDÉFINIES :\n")
-
     for q in QUESTIONS_TEST:
         if q["question"]:
             apercu = q["question"][:80].replace("\n", " ").strip() + "..."
             print(f"  {q['id']}. [{q['categorie']}] {apercu}")
         else:
             print(f"  {q['id']}. [Question libre] Saisir votre propre texte")
-
     print()
+
+
+def saisir_texte_libre() -> str:
+    """Demande à l'utilisateur de saisir son propre texte à auditer."""
+    print(f"\n{Fore.YELLOW}📝 Saisissez le texte à auditer (terminez avec une ligne vide) :")
+    lignes = []
+    while True:
+        ligne = input()
+        if ligne == "" and lignes:
+            break
+        lignes.append(ligne)
+    return "\n".join(lignes)
+
+
+def choisir_question() -> str:
+    """Affiche les questions de test et demande un choix."""
+    afficher_questions()
+
     while True:
         choix = input(
             f"{Fore.YELLOW}Choisissez une question (1-{len(QUESTIONS_TEST)}) : {Style.RESET_ALL}"
@@ -145,20 +163,16 @@ def choisir_question() -> str:
 
         try:
             index = int(choix)
-            q = next((q for q in QUESTIONS_TEST if q["id"] == index), None)
-            if q:
-                if q["question"] is None:
-                    print(f"\n{Fore.YELLOW}📝 Saisissez le texte à auditer (terminez avec une ligne vide) :")
-                    lignes = []
-                    while True:
-                        ligne = input()
-                        if ligne == "" and lignes:
-                            break
-                        lignes.append(ligne)
-                    return "\n".join(lignes)
-                return q["question"]
-            else:
+            q = next((item for item in QUESTIONS_TEST if item["id"] == index), None)
+
+            if not q:
                 print(f"{Fore.RED}  ❌ Numéro invalide.")
+                continue
+
+            if q["question"] is None:
+                return saisir_texte_libre()
+            return q["question"]
+
         except ValueError:
             print(f"{Fore.RED}  ❌ Veuillez entrer un numéro valide.")
 

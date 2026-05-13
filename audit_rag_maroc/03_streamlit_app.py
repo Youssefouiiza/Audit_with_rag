@@ -18,6 +18,7 @@ from config import (
     RETRIEVAL_K, RETRIEVAL_TYPE, TEMPERATURE,
     AVAILABLE_MODELS, DEFAULT_MODEL,
     AUDIT_PROMPT_TEMPLATE, APP_TITLE, APP_ICON, APP_DESCRIPTION,
+    RESULTS_SECTION_TITLE,
 )
 
 # ── Configuration Streamlit ──────────────────────────────────
@@ -374,7 +375,7 @@ with col_gauche:
 # ── Exécution de l'audit ──────────────────────────────────────
 if btn_audit and texte_document.strip():
     with col_droite:
-        st.markdown("## 📊 Résultats de l'audit")
+        st.markdown(RESULTS_SECTION_TITLE)
 
         with st.spinner(f"⚖️ Analyse juridique en cours avec {modele_choisi}...\n(30-120 secondes selon votre machine)"):
             debut = time.time()
@@ -422,7 +423,7 @@ if st.session_state.resultat_courant:
     res = st.session_state.resultat_courant
 
     with col_droite:
-        st.markdown("## 📊 Résultats de l'audit")
+        st.markdown(RESULTS_SECTION_TITLE)
 
         # Métriques rapides
         texte = res["texte"]
@@ -484,7 +485,7 @@ if st.session_state.resultat_courant:
 # Message d'accueil si rien encore
 elif not btn_audit:
     with col_droite:
-        st.markdown("## 📊 Résultats de l'audit")
+        st.markdown(RESULTS_SECTION_TITLE)
         st.markdown("""
         <div style="text-align:center; padding:3rem; color:#8b9ab0;">
             <div style="font-size:3rem;">⚖️</div>

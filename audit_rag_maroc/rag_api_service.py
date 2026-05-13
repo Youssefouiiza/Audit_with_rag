@@ -142,6 +142,15 @@ def get_vectorstore():
     if not db_path.exists():
         return None
     try:
+        # Fix: Disable low_cpu_mem_usage default to prevent
+        # "Cannot copy out of meta tensor" error in newer transformers
+        try:
+            import transformers.modeling_utils
+            if hasattr(transformers.modeling_utils, 'LOW_CPU_MEM_USAGE_DEFAULT'):
+                transformers.modeling_utils.LOW_CPU_MEM_USAGE_DEFAULT = False
+        except Exception:
+            pass
+
         from langchain_community.embeddings import HuggingFaceEmbeddings
         from langchain_community.vectorstores import Chroma
         embeddings = HuggingFaceEmbeddings(
@@ -177,166 +186,72 @@ def check_ollama_available(model_key: str) -> bool:
     return False
 
 
-def run_rag_analysis(audit_id: str, request: AnalyseRequest):
-    """Exécute l'analyse RAG en arrière-plan."""
-    analyses_cache[audit_id] = AnalyseStatus(status="running")
-    try:
-        # ── Vérification 1 : des documents sont requis ────────────
-        has_docs = bool(request.document_texts) or bool(request.document_urls)
-        if not has_docs:
-            result = {
-                "audit_id": audit_id,
-                "model_used": "N/A",
-                "analysed_at": datetime.now().isoformat(),
-                "risk_score": 0,
-                "risk_level": "LOW",
-                "violations": [],
-                "sources": [],
-                "no_documents": True,
-                "summary": (
-                    "⚠️ Aucun document n'a été uploadé sur cet audit. "
-                    "L'analyse RAG nécessite au minimum un document (contrat, rapport, convention, etc.) "
-                    "pour effectuer une comparaison avec la base juridique marocaine."
-                ),
-                "recommandations": [{
-                    "action": "Uploadez les documents à analyser (contrats, rapports, conventions, statuts…) puis relancez l'analyse.",
-                    "priorite": "IMMEDIATE",
-                    "responsable": "Auditeur",
-                    "reference": "",
-                }],
-                "conclusion": "Analyse impossible : veuillez d'abord uploader les documents de l'audit.",
-            }
-            if DOCX_AVAILABLE:
-                report_path = generate_word_report(audit_id, request, result)
-                result["report_path"] = str(report_path)
-                result["report_filename"] = report_path.name
-            analyses_cache[audit_id] = AnalyseStatus(status="done", result=result)
-            return
+def finalize_analysis_status(audit_id: str, request: AnalyseRequest, result: dict):
+    """Génère le rapport et met à jour le statut final."""
+    if DOCX_AVAILABLE:
+        report_path = generate_word_report(audit_id, request, result)
+        result["report_path"] = str(report_path)
+        result["report_filename"] = report_path.name
+    analyses_cache[audit_id] = AnalyseStatus(status="done", result=result)
 
-        # ── Vérification 2 : Ollama disponible ? ──────────────────
-        model_key = request.model if request.model in AVAILABLE_MODELS else DEFAULT_MODEL
-        ollama_ok = check_ollama_available(model_key)
 
-        if not ollama_ok:
-            result = {
-                "audit_id": audit_id,
-                "model_used": "N/A",
-                "analysed_at": datetime.now().isoformat(),
-                "risk_score": 0,
-                "risk_level": "LOW",
-                "violations": [],
-                "sources": [],
-                "ollama_required": True,
-                "summary": (
-                    f"⚠️ Le modèle LLM '{model_key}' n'est pas disponible. "
-                    "Pour effectuer une vraie analyse juridique, Ollama doit être installé et lancé sur votre PC "
-                    f"avec le modèle '{model_key}' téléchargé."
-                ),
-                "recommandations": [
-                    {
-                        "action": "Installez Ollama depuis https://ollama.ai",
-                        "priorite": "IMMEDIATE",
-                        "responsable": "Administrateur",
-                        "reference": "https://ollama.ai",
-                    },
-                    {
-                        "action": f"Lancez Ollama puis téléchargez le modèle : ollama pull {model_key}",
-                        "priorite": "IMMEDIATE",
-                        "responsable": "Administrateur",
-                        "reference": "",
-                    },
-                    {
-                        "action": "Relancez l'analyse une fois Ollama démarré.",
-                        "priorite": "COURT_TERME",
-                        "responsable": "Auditeur",
-                        "reference": "",
-                    },
-                ],
-                "conclusion": f"Analyse bloquée : Ollama avec le modèle '{model_key}' est requis.",
-            }
-            if DOCX_AVAILABLE:
-                report_path = generate_word_report(audit_id, request, result)
-                result["report_path"] = str(report_path)
-                result["report_filename"] = report_path.name
-            analyses_cache[audit_id] = AnalyseStatus(status="done", result=result)
-            return
+def prepare_audit_text(request: AnalyseRequest) -> str:
+    """Regroupe tout le texte des documents à auditer."""
+    texte = f"Mission d'audit : {request.audit_title}\n"
+    if request.audit_description:
+        texte += f"Description : {request.audit_description}\n"
+    texte += "\n=== DOCUMENTS FOURNIS ===\n"
 
-        # ── Analyse RAG complète (Ollama + Documents disponibles) ──
-        vectorstore = get_vectorstore()
+    # 1) Documents texte
+    for doc in request.document_texts:
+        content = doc.get('content', '').strip()
+        if content and not content.startswith(('[Contenu non disponible', '[Erreur')):
+            texte += f"\n--- {doc.get('filename', 'Document')} ---\n"
+            texte += content[:8000] + ("\n[... tronqué]" if len(content) > 8000 else "")
 
-        # Construction du texte à auditer depuis les documents
-        texte_a_auditer = f"Mission d'audit : {request.audit_title}\n"
-        if request.audit_description:
-            texte_a_auditer += f"Description : {request.audit_description}\n"
+    # 2) Documents URLs
+    for doc_url in request.document_urls:
+        url = doc_url.get('download_url', '')
+        if url:
+            content = download_and_extract_text(doc_url.get('filename', 'Document'), url)
+            if content and not content.startswith('['):
+                texte += f"\n--- {doc_url.get('filename', 'Document')} ---\n"
+                texte += content[:8000] + ("\n[... tronqué]" if len(content) > 8000 else "")
+    return texte
 
-        texte_a_auditer += "\n=== DOCUMENTS FOURNIS ===\n"
 
-        # 1) Documents envoyés directement comme texte
-        for doc in request.document_texts:
-            fname = doc.get('filename', 'Document')
-            content = doc.get('content', '').strip()
-            if content and not content.startswith('[Contenu non disponible') and not content.startswith('[Erreur'):
-                texte_a_auditer += f"\n--- {fname} ---\n"
-                texte_a_auditer += content[:8000]
-                if len(content) > 8000:
-                    texte_a_auditer += "\n[... tronqué]"
+def retrieve_legal_context(vectorstore, audit_text: str):
+    """Recherche les textes de loi pertinents."""
+    legal_chunks = vectorstore.similarity_search(audit_text, k=RETRIEVAL_K)
+    seen = set()
+    context_legal = ""
+    sources_used = []
+    for doc in legal_chunks:
+        nom = doc.metadata.get("nom_fichier", "Inconnu")
+        cat = doc.metadata.get("categorie", "")
+        page = doc.metadata.get("page", "?")
+        context_legal += f"\n[SOURCE: {nom} | {cat} | page {page}]\n{doc.page_content}\n"
+        if f"{nom}_p{page}" not in seen:
+            seen.add(f"{nom}_p{page}")
+            sources_used.append({
+                "fichier": nom,
+                "categorie": cat,
+                "page": str(page),
+                "extrait": doc.page_content[:200].replace("\n", " ")
+            })
+    return context_legal, sources_used
 
-        # 2) Documents à télécharger depuis les URLs
-        for doc_url in request.document_urls:
-            fname = doc_url.get('filename', 'Document')
-            url   = doc_url.get('download_url', '')
-            if url:
-                content = download_and_extract_text(fname, url)
-                if content and not content.startswith('[') :
-                    texte_a_auditer += f"\n--- {fname} ---\n"
-                    texte_a_auditer += content[:8000]
-                    if len(content) > 8000:
-                        texte_a_auditer += "\n[... tronqué]"
-                else:
-                    print(f"⚠️ Contenu non extrait pour {fname}: {content}")
 
-        print(f"📝 Texte total à auditer : {len(texte_a_auditer)} caractères")
-
-        violations = []
-        sources_used = []
-
-        if vectorstore:
-            try:
-                import requests as req_lib
-                import json
-
-                # ── Étape 1 : Récupérer les chunks juridiques pertinents ──
-                print("🔍 Recherche des lois pertinentes dans la base vectorielle...")
-                legal_chunks = vectorstore.similarity_search(texte_a_auditer, k=RETRIEVAL_K)
-
-                # Collecter les sources
-                seen = set()
-                context_legal = ""
-                for doc in legal_chunks:
-                    nom = doc.metadata.get("nom_fichier", "Inconnu")
-                    cat = doc.metadata.get("categorie", "")
-                    page = doc.metadata.get("page", "?")
-                    key = f"{nom}_p{page}"
-                    context_legal += f"\n[SOURCE: {nom} | {cat} | page {page}]\n{doc.page_content}\n"
-                    if key not in seen:
-                        seen.add(key)
-                        sources_used.append({
-                            "fichier": nom,
-                            "categorie": cat,
-                            "page": str(page),
-                            "extrait": doc.page_content[:200].replace("\n", " ")
-                        })
-
-                print(f"📚 {len(legal_chunks)} chunks juridiques récupérés")
-
-                # ── Étape 2 : Construire le prompt et appeler Mistral directement ──
-                prompt = f"""INSTRUCTIONS STRICTES : Tu es un expert juridique marocain. Réponds UNIQUEMENT en français. Utilise EXACTEMENT le format demandé ci-dessous. Ne fais PAS de commentaires généraux avant les violations.
+def call_ollama_mistral(model_key: str, context_legal: str, audit_text: str) -> str:
+    """Appelle l'API locale Ollama."""
+    import requests
+    prompt = f"""INSTRUCTIONS STRICTES : Tu es un expert juridique marocain. Réponds UNIQUEMENT en français. Utilise EXACTEMENT le format demandé ci-dessous. Ne fais PAS de commentaires généraux avant les violations.
 
 TEXTES DE LOI MAROCAINS DISPONIBLES :
 {context_legal}
 
 DOCUMENT CLIENT À AUDITER :
-{texte_a_auditer}
+{audit_text}
 
 TÂCHE : Identifie TOUTES les violations du document client par rapport aux lois marocaines ci-dessus. Pour chaque problème trouvé dans le document, écris EXACTEMENT :
 
@@ -349,38 +264,56 @@ Si le document client est totalement conforme : écris uniquement ✅ CONFORME
 
 REMARQUE IMPORTANTE : Commence directement par === VIOLATION === ou ✅ CONFORME. Ne fais PAS d'introduction.
 """
+    resp = requests.post(
+        "http://localhost:11434/api/generate",
+        json={
+            "model": model_key,
+            "prompt": prompt,
+            "stream": False,
+            "options": {"temperature": 0.0, "num_predict": 2048}
+        },
+        timeout=180
+    )
+    resp.raise_for_status()
+    return resp.json().get("response", "")
 
-                print("🤖 Envoi à Mistral via Ollama...")
-                resp = req_lib.post(
-                    "http://localhost:11434/api/generate",
-                    json={
-                        "model": model_key,
-                        "prompt": prompt,
-                        "stream": False,
-                        "options": {"temperature": 0.0, "num_predict": 2048}
-                    },
-                    timeout=180
-                )
-                resp.raise_for_status()
-                rag_answer = resp.json().get("response", "")
-                print(f"✅ Mistral répondu : {len(rag_answer)} caractères")
-                print(f"--- RÉPONSE MISTRAL ---\n{rag_answer[:500]}\n---")
 
-                violations = parse_violations(rag_answer)
-                model_used = f"RAG + Ollama ({model_key})"
+def run_rag_analysis(audit_id: str, request: AnalyseRequest):
+    """Exécute l'analyse RAG en arrière-plan."""
+    analyses_cache[audit_id] = AnalyseStatus(status="running")
+    try:
+        # 1. Vérification des documents
+        if not (request.document_texts or request.document_urls):
+            result = build_error_result(audit_id, "DOCS_MISSING")
+            return finalize_analysis_status(audit_id, request, result)
 
-            except Exception as e:
-                raise RuntimeError(f"Erreur analyse: {e}")
-        else:
-            raise RuntimeError("Base vectorielle non chargée. Lancez d'abord 01_load_and_index.py")
+        # 2. Vérification Ollama
+        model_key = request.model if request.model in AVAILABLE_MODELS else DEFAULT_MODEL
+        if not check_ollama_available(model_key):
+            result = build_error_result(audit_id, "OLLAMA_OFFLINE", model_key)
+            return finalize_analysis_status(audit_id, request, result)
 
-        # Calcul du score de risque
+        # 3. Analyse RAG
+        vectorstore = get_vectorstore()
+        if not vectorstore:
+            raise RuntimeError("Base vectorielle non chargée.")
+
+        audit_text = prepare_audit_text(request)
+        print(f"📝 Texte total à auditer : {len(audit_text)} caractères")
+
+        context_legal, sources_used = retrieve_legal_context(vectorstore, audit_text)
+        print(f"📚 {len(sources_used)} sources juridiques identifiées")
+
+        print(f"🤖 Envoi à Ollama ({model_key})...")
+        rag_answer = call_ollama_mistral(model_key, context_legal, audit_text)
+        violations = parse_violations(rag_answer)
+
+        # 4. Compilation des résultats
         score = compute_risk_score(violations)
         level = score_to_level(score)
-
         result = {
             "audit_id": audit_id,
-            "model_used": model_used,
+            "model_used": f"RAG + Ollama ({model_key})",
             "analysed_at": datetime.now().isoformat(),
             "risk_score": score,
             "risk_level": level,
@@ -390,92 +323,134 @@ REMARQUE IMPORTANTE : Commence directement par === VIOLATION === ou ✅ CONFORME
             "recommandations": build_recommendations(violations),
             "conclusion": build_conclusion(violations, score),
         }
-
-        if DOCX_AVAILABLE:
-            report_path = generate_word_report(audit_id, request, result)
-            result["report_path"] = str(report_path)
-            result["report_filename"] = report_path.name
-
-        analyses_cache[audit_id] = AnalyseStatus(status="done", result=result)
+        finalize_analysis_status(audit_id, request, result)
 
     except Exception as e:
+        print(f"❌ Erreur analyse RAG : {e}")
         analyses_cache[audit_id] = AnalyseStatus(status="error", error=str(e))
 
 
+def build_error_result(audit_id: str, error_type: str, model: str = "N/A") -> dict:
+    """Construit un résultat d'erreur structuré."""
+    base = {
+        "audit_id": audit_id, "model_used": "N/A", "analysed_at": datetime.now().isoformat(),
+        "risk_score": 0, "risk_level": "LOW", "violations": [], "sources": [],
+    }
+    if error_type == "DOCS_MISSING":
+        base.update({
+            "no_documents": True,
+            "summary": "⚠️ Aucun document n'a été uploadé.",
+            "recommandations": [{"action": "Uploadez des documents.", "priorite": "IMMEDIATE", "responsable": "Auditeur", "reference": ""}],
+            "conclusion": "Analyse impossible : documents manquants."
+        })
+    elif error_type == "OLLAMA_OFFLINE":
+        base.update({
+            "ollama_required": True,
+            "summary": f"⚠️ Le modèle '{model}' n'est pas disponible dans Ollama.",
+            "recommandations": [{"action": f"Lancez Ollama: ollama pull {model}", "priorite": "IMMEDIATE", "responsable": "Admin", "reference": ""}],
+            "conclusion": f"Analyse bloquée : Ollama '{model}' requis."
+        })
+    return base
+
+
 def parse_violations(rag_text: str) -> list:
-    """Parse les violations depuis la réponse RAG de Mistral — parsing robuste."""
+    """Parse les violations depuis la réponse RAG de Mistral — orchestrateur."""
     print(f"🔎 Parsing réponse Mistral ({len(rag_text)} chars)...")
 
-    # Cas conforme → aucune violation
     if "✅ CONFORME" in rag_text and "=== VIOLATION ===" not in rag_text:
         print("✅ Document conforme détecté")
         return []
 
-    violations = []
     blocks = rag_text.split("=== VIOLATION ===")
     print(f"📋 Blocs de violations trouvés : {len(blocks) - 1}")
 
+    violations = []
     for block in blocks[1:]:
-        lines = block.strip().split("\n")
-        violation = {
-            "titre": "",
-            "texte_original": "",
-            "citation": "",
-            "source": "",
-            "severite": "MEDIUM",
-        }
-        current_field = None
-        for line in lines:
-            stripped = line.strip()
-            if not stripped:
-                continue
-
-            # Détection des marqueurs (avec ou sans emoji)
-            if "TEXTE ORIGINAL" in stripped or stripped.startswith("📌"):
-                val = stripped.split(":", 1)[-1].strip().strip('"')
-                violation["texte_original"] = val
-                violation["titre"] = val[:120] + ("…" if len(val) > 120 else "")
-                current_field = "texte"
-            elif "CITATION" in stripped or stripped.startswith("📖"):
-                val = stripped.split(":", 1)[-1].strip().strip('"').strip("'")
-                violation["citation"] = val
-                current_field = "citation"
-            elif "SOURCE" in stripped or stripped.startswith("📁"):
-                val = stripped.split(":", 1)[-1].strip().strip('"')
-                violation["source"] = val
-                current_field = "source"
-            elif current_field == "texte" and not violation["texte_original"]:
-                # Ligne de continuation si le champ est vide
-                violation["texte_original"] = stripped
-                violation["titre"] = stripped[:120]
-
-        # Si le bloc contient du texte mais pas de marqueurs — tenter extraction brute
-        if not violation["texte_original"] and not violation["citation"]:
-            # Prendre le premier contenu non vide du bloc
-            for line in lines:
-                line = line.strip()
-                if line and not line.startswith("==="):
-                    violation["texte_original"] = line[:200]
-                    violation["titre"] = line[:120]
-                    break
-
-        # Déduire la sévérité
-        texte_combined = (violation["texte_original"] + " " + violation["citation"]).lower()
-        if any(kw in texte_combined for kw in ["fraude", "pénal", "criminel", "nullité", "prison", "escroquerie"]):
-            violation["severite"] = "CRITICAL"
-        elif any(kw in texte_combined for kw in ["licenciement", "sanction", "amende", "infraction", "illégal", "interdit", "non déclaré", "non payé"]):
-            violation["severite"] = "HIGH"
-        elif any(kw in texte_combined for kw in ["délai", "procédure", "formalité", "obligation", "minimum", "salaire", "capital"]):
-            violation["severite"] = "MEDIUM"
-        else:
-            violation["severite"] = "MEDIUM"  # MEDIUM par défaut (pas LOW)
-
-        if violation["texte_original"] or violation["citation"]:
-            violations.append(violation)
-            print(f"  ✓ Violation: [{violation['severite']}] {violation['titre'][:60]}")
+        v = _parse_single_violation_block(block)
+        if v:
+            violations.append(v)
+            print(f"  ✓ Violation: [{v['severite']}] {v['titre'][:60]}")
 
     print(f"📊 Total violations parsées : {len(violations)}")
     return violations
+
+
+def _parse_single_violation_block(block: str) -> Optional[dict]:
+    """Parse un bloc de texte correspondant à une violation unique."""
+    lines = [line.strip() for line in block.strip().split("\n") if line.strip()]
+    if not lines:
+        return None
+
+    violation = {
+        "titre": "", "texte_original": "", "citation": "",
+        "source": "", "severite": "MEDIUM"
+    }
+
+    current_field = None
+    for line in lines:
+        current_field = _process_violation_line(line, violation, current_field)
+
+    # Extraction brute si aucun marqueur trouvé
+    if not violation["texte_original"] and not violation["citation"]:
+        _attempt_brute_extraction(lines, violation)
+
+    # Finalisation (Sévérité et validité)
+    if not (violation["texte_original"] or violation["citation"]):
+        return None
+
+    violation["severite"] = _deduce_violation_severity(violation)
+    return violation
+
+
+def _process_violation_line(line: str, violation: dict, current_field: Optional[str]) -> Optional[str]:
+    """Traite une ligne d'un bloc de violation et met à jour l'objet violation."""
+    if "TEXTE ORIGINAL" in line or line.startswith("📌"):
+        val = line.split(":", 1)[-1].strip().strip('"')
+        violation["texte_original"] = val
+        violation["titre"] = val[:120] + ("…" if len(val) > 120 else "")
+        return "texte"
+
+    if "CITATION" in line or line.startswith("📖"):
+        violation["citation"] = line.split(":", 1)[-1].strip().strip('"').strip("'")
+        return "citation"
+
+    if "SOURCE" in line or line.startswith("📁"):
+        violation["source"] = line.split(":", 1)[-1].strip().strip('"')
+        return "source"
+
+    # Continuation de texte
+    if current_field == "texte" and not violation["texte_original"]:
+        violation["texte_original"] = line
+        violation["titre"] = line[:120]
+
+    return current_field
+
+
+def _attempt_brute_extraction(lines: list, violation: dict):
+    """Tente d'extraire des informations d'un bloc sans marqueurs explicites."""
+    for line in lines:
+        if not line.startswith("==="):
+            violation["texte_original"] = line[:200]
+            violation["titre"] = line[:120]
+            break
+
+
+def _deduce_violation_severity(violation: dict) -> str:
+    """Déduit la sévérité d'une violation basée sur des mots-clés."""
+    txt = (violation["texte_original"] + " " + violation["citation"]).lower()
+
+    critical_keywords = ["fraude", "pénal", "criminel", "nullité", "prison", "escroquerie"]
+    high_keywords = ["licenciement", "sanction", "amende", "infraction", "illégal", "interdit", "non déclaré", "non payé"]
+    medium_keywords = ["délai", "procédure", "formalité", "obligation", "minimum", "salaire", "capital"]
+
+    if any(kw in txt for kw in critical_keywords):
+        return "CRITICAL"
+    if any(kw in txt for kw in high_keywords):
+        return "HIGH"
+    if any(kw in txt for kw in medium_keywords):
+        return "MEDIUM"
+
+    return "MEDIUM"
 
 
 def compute_risk_score(violations: list) -> int:
@@ -528,45 +503,64 @@ def build_conclusion(violations, score) -> str:
 # ── Génération du rapport Word ────────────────────────────────
 
 def generate_word_report(audit_id: str, request: AnalyseRequest, result: dict) -> Path:
-    """Génère un rapport Word professionnel complet."""
+    """Génère un rapport Word professionnel complet en utilisant des helpers."""
     doc = DocxDocument()
 
-    # Styles généraux
+    # Style par défaut
     style = doc.styles['Normal']
     style.font.name = 'Calibri'
     style.font.size = Pt(11)
 
-    # ── Page de titre ──────────────────────────────────────────
+    # Construction séquentielle du rapport
+    _add_title_page(doc, audit_id, request, result)
+    _add_executive_summary(doc, result)
+    _add_violations_section(doc, result)
+    _add_sources_section(doc, result)
+    _add_recommendations_section(doc, result)
+
+    # Conclusion
+    doc.add_heading("5. CONCLUSION", level=1)
+    doc.add_paragraph(result.get("conclusion", ""))
+
+    _add_documents_section(doc, request)
+    _add_footer(doc)
+
+    # Sauvegarde
+    filename = f"rapport_rag_{audit_id[:8]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
+    path = reports_dir / filename
+    doc.save(str(path))
+    print(f"✅ Rapport Word généré : {path}")
+    return path
+
+
+def _add_title_page(doc, audit_id: str, request: AnalyseRequest, result: dict):
+    """Ajoute la page de garde du rapport."""
     title_par = doc.add_paragraph()
     title_par.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = title_par.add_run("⚖️ RAPPORT D'ANALYSE JURIDIQUE\nRAG DROIT MAROCAIN")
-    run.bold = True
-    run.font.size = Pt(20)
-    run.font.color.rgb = RGBColor(0x1E, 0x40, 0xAF)  # bleu
+    run.bold, run.font.size = True, Pt(20)
+    run.font.color.rgb = RGBColor(0x1E, 0x40, 0xAF)
 
     doc.add_paragraph()
-
-    # Sous-titre mission
     sub = doc.add_paragraph()
     sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
     sr = sub.add_run(f"Mission : {request.audit_title}")
-    sr.bold = True
-    sr.font.size = Pt(14)
+    sr.bold, sr.font.size = True, Pt(14)
 
     meta = doc.add_paragraph()
     meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
     meta.add_run(f"Date d'analyse : {datetime.now().strftime('%d/%m/%Y à %H:%M')} | "
                  f"Modèle : {result.get('model_used', 'RAG')} | "
                  f"Réf. : AUDIT-{audit_id[:8].upper()}")
-
     doc.add_page_break()
 
-    # ── Résumé exécutif ────────────────────────────────────────
+
+def _add_executive_summary(doc, result: dict):
+    """Ajoute le résumé exécutif avec le score de risque."""
     h1 = doc.add_heading("1. RÉSUMÉ EXÉCUTIF", level=1)
     h1.runs[0].font.color.rgb = RGBColor(0x1E, 0x40, 0xAF)
 
-    score = result.get("risk_score", 0)
-    level = result.get("risk_level", "LOW")
+    score, level = result.get("risk_score", 0), result.get("risk_level", "LOW")
     colors = {"CRITICAL": "CC0000", "HIGH": "E65C00", "MEDIUM": "B8860B", "LOW": "006400"}
     level_labels = {"CRITICAL": "CRITIQUE", "HIGH": "ÉLEVÉ", "MEDIUM": "MODÉRÉ", "LOW": "FAIBLE"}
 
@@ -577,105 +571,80 @@ def generate_word_report(audit_id: str, request: AnalyseRequest, result: dict) -
     col = colors.get(level, "000000")
     sr2.font.color.rgb = RGBColor(int(col[0:2], 16), int(col[2:4], 16), int(col[4:6], 16))
     sr2.font.size = Pt(14)
-
     doc.add_paragraph(result.get("summary", ""))
 
-    # ── Violations détectées ───────────────────────────────────
+
+def _add_violations_section(doc, result: dict):
+    """Ajoute la section détaillée des non-conformités."""
     doc.add_heading("2. NON-CONFORMITÉS DÉTECTÉES", level=1)
-
     violations = result.get("violations", [])
+
     if not violations:
-        doc.add_paragraph("✅ Aucune non-conformité majeure détectée dans les documents fournis.")
-    else:
-        for i, v in enumerate(violations, 1):
-            sev = v.get("severite", "MEDIUM")
-            sev_labels = {"CRITICAL": "🔴 CRITIQUE", "HIGH": "🟠 ÉLEVÉ", "MEDIUM": "🟡 MODÉRÉ", "LOW": "🟢 FAIBLE"}
+        doc.add_paragraph("✅ Aucune non-conformité majeure détectée.")
+        return
 
-            viol_heading = doc.add_paragraph()
-            r = viol_heading.add_run(f"Violation {i} : {v.get('titre', 'Sans titre')}")
-            r.bold = True
-            r.font.size = Pt(12)
+    for i, v in enumerate(violations, 1):
+        sev = v.get("severite", "MEDIUM")
+        sev_labels = {"CRITICAL": "🔴 CRITIQUE", "HIGH": "🟠 ÉLEVÉ", "MEDIUM": "🟡 MODÉRÉ", "LOW": "🟢 FAIBLE"}
 
-            doc.add_paragraph(f"Sévérité : {sev_labels.get(sev, sev)}")
+        vh = doc.add_paragraph()
+        vh.add_run(f"Violation {i} : {v.get('titre', 'Sans titre')}").bold = True
+        doc.add_paragraph(f"Sévérité : {sev_labels.get(sev, sev)}")
 
-            if v.get("texte_original"):
+        for field, label in [("texte_original", "Texte concerné : "), ("citation", "Référence légale : "), ("source", "Source : ")]:
+            if v.get(field):
                 p = doc.add_paragraph()
-                p.add_run("Texte concerné : ").bold = True
-                p.add_run(v["texte_original"])
+                p.add_run(label).bold = True
+                run = p.add_run(f'"{v[field]}"' if field == "citation" else v[field])
+                if field == "citation": run.italic = True
+        doc.add_paragraph()
 
-            if v.get("citation"):
-                p2 = doc.add_paragraph()
-                p2.add_run("Référence légale : ").bold = True
-                p2.add_run(f'"{v["citation"]}"')
-                p2.runs[-1].italic = True
 
-            if v.get("source"):
-                doc.add_paragraph(f"Source : {v['source']}")
-
-            if v.get("categorie"):
-                doc.add_paragraph(f"Catégorie : {v['categorie']}")
-
-            doc.add_paragraph()
-
-    # ── Sources juridiques utilisées ───────────────────────────
+def _add_sources_section(doc, result: dict):
+    """Ajoute la liste des sources consultées."""
     sources = result.get("sources", [])
-    if sources:
-        doc.add_heading("3. SOURCES JURIDIQUES MAROCAINES CONSULTÉES", level=1)
-        for s in sources:
-            p = doc.add_paragraph(style='List Bullet')
-            p.add_run(f"{s.get('fichier', '')}").bold = True
-            p.add_run(f" — {s.get('categorie', '')} (page {s.get('page', '?')})")
-            if s.get("extrait"):
-                ep = doc.add_paragraph()
-                ep.add_run("   Extrait : ").italic = True
-                ep.add_run(f'"{s["extrait"]}"').italic = True
+    if not sources: return
+    doc.add_heading("3. SOURCES JURIDIQUES CONSULTÉES", level=1)
+    for s in sources:
+        p = doc.add_paragraph(style='List Bullet')
+        p.add_run(f"{s.get('fichier', '')}").bold = True
+        p.add_run(f" — {s.get('categorie', '')} (p.{s.get('page', '?')})")
+        if s.get("extrait"):
+            ep = doc.add_paragraph()
+            ep.add_run("   Extrait : ").italic = True
+            ep.add_run(f'"{s["extrait"]}"').italic = True
 
-    # ── Recommandations ────────────────────────────────────────
+
+def _add_recommendations_section(doc, result: dict):
+    """Ajoute les recommandations basées sur l'analyse."""
     recs = result.get("recommandations", [])
-    if recs:
-        doc.add_heading("4. RECOMMANDATIONS", level=1)
-        prio_labels = {"IMMEDIATE": "⚡ IMMÉDIATE", "COURT_TERME": "📅 COURT TERME", "LONG_TERME": "📆 LONG TERME"}
-        for i, rec in enumerate(recs, 1):
-            rp = doc.add_paragraph()
-            rp.add_run(f"R{i}. {rec.get('action', '')}").bold = True
-            doc.add_paragraph(
-                f"   Priorité : {prio_labels.get(rec.get('priorite', ''), rec.get('priorite', ''))} | "
-                f"Responsable : {rec.get('responsable', 'Auditeur')}"
-            )
-            if rec.get("reference"):
-                doc.add_paragraph(f"   Référence : {rec['reference']}")
+    if not recs: return
+    doc.add_heading("4. RECOMMANDATIONS", level=1)
+    prio_labels = {"IMMEDIATE": "⚡ IMMÉDIATE", "COURT_TERME": "📅 COURT TERME", "LONG_TERME": "📆 LONG TERME"}
+    for i, rec in enumerate(recs, 1):
+        rp = doc.add_paragraph()
+        rp.add_run(f"R{i}. {rec.get('action', '')}").bold = True
+        doc.add_paragraph(f"   Priorité : {prio_labels.get(rec.get('priorite', ''), rec.get('priorite', ''))} | Resp. : {rec.get('responsable', 'Auditeur')}")
 
-    # ── Conclusion ─────────────────────────────────────────────
-    doc.add_heading("5. CONCLUSION", level=1)
-    doc.add_paragraph(result.get("conclusion", ""))
 
-    # ── Documents analysés ─────────────────────────────────────
-    if request.document_texts:
-        doc.add_heading("6. DOCUMENTS ANALYSÉS", level=1)
-        for doc_item in request.document_texts:
-            dp = doc.add_paragraph(style='List Bullet')
-            dp.add_run(doc_item.get("filename", "Document")).bold = True
+def _add_documents_section(doc, request: AnalyseRequest):
+    """Liste les documents soumis à l'analyse."""
+    if not request.document_texts: return
+    doc.add_heading("6. DOCUMENTS ANALYSÉS", level=1)
+    for doc_item in request.document_texts:
+        doc.add_paragraph(doc_item.get("filename", "Document"), style='List Bullet').runs[0].bold = True
 
-    # ── Pied de page ───────────────────────────────────────────
+
+def _add_footer(doc):
+    """Ajoute le pied de page informatif."""
     doc.add_paragraph()
-    footer_p = doc.add_paragraph()
-    footer_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    fr = footer_p.add_run(
-        "─────────────────────────────────────────────\n"
-        "Rapport généré par le système RAG Audit Juridique Marocain\n"
-        "Base documentaire : Droit marocain (10 domaines juridiques)\n"
-        "Ce rapport est fourni à titre indicatif. Consultez un juriste qualifié."
-    )
-    fr.italic = True
-    fr.font.size = Pt(9)
+    fp = doc.add_paragraph()
+    fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    fr = fp.add_run("─────────────────────────────────────────────\n"
+                  "Rapport généré par le système RAG Audit Juridique Marocain\n"
+                  "Base documentaire : Droit marocain | Ce rapport est indicatif.")
+    fr.italic, fr.font.size = True, Pt(9)
     fr.font.color.rgb = RGBColor(0x6B, 0x72, 0x80)
-
-    # Sauvegarde
-    filename = f"rapport_rag_{audit_id[:8]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
-    path = reports_dir / filename
-    doc.save(str(path))
-    print(f"✅ Rapport Word généré : {path}")
-    return path
 
 
 # ── Endpoints API ─────────────────────────────────────────────
@@ -707,14 +676,14 @@ def start_analyse(request: AnalyseRequest, background_tasks: BackgroundTasks):
     return {"message": "Analyse lancée", "audit_id": audit_id, "status": "pending"}
 
 
-@app.get("/analyse/{audit_id}/status")
+@app.get("/analyse/{audit_id}/status", responses={404: {"description": "Analyse non trouvée"}})
 def get_status(audit_id: str):
     if audit_id not in analyses_cache:
         raise HTTPException(status_code=404, detail="Analyse non trouvée")
     return analyses_cache[audit_id]
 
 
-@app.get("/report/{audit_id}/download")
+@app.get("/report/{audit_id}/download", responses={404: {"description": "Rapport non disponible ou introuvable"}})
 def download_report(audit_id: str):
     status = analyses_cache.get(audit_id)
     if not status or status.status != "done":

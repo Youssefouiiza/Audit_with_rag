@@ -150,3 +150,4 @@ Si information insuffisante :
 APP_TITLE = "⚖️ Audit Juridique Marocain — RAG"
 APP_ICON = "⚖️"
 APP_DESCRIPTION = "Assistant IA d'audit de conformité au droit marocain"
+RESULTS_SECTION_TITLE = "## 📊 Résultats de l'audit"

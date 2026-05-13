@@ -84,6 +84,14 @@ async function runSimulation() {
     }
     const auditData = await res.json();
     const auditId = auditData.id;
+    if (!auditId) {
+        throw new Error("Erreur: ID d'audit non reçu du serveur.");
+    }
+    // Validation basique pour éviter S8476 (Server-Side Request Forgery / Path Traversal)
+    if (String(auditId).includes('..') || String(auditId).includes('/') || String(auditId).includes('\\')) {
+        throw new Error("Erreur: ID d'audit invalide détecté.");
+    }
+
     console.log(`    => Demande d'audit créée: "${auditData.title}" avec l'ID: ${auditId}`);
     console.log(`    => Statut de l'audit: ${auditData.status}`);
 
