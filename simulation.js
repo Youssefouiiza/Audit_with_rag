@@ -90,9 +90,9 @@ async function runSimulation() {
     if (!auditId) {
         throw new Error("Erreur: ID d'audit non reçu du serveur.");
     }
-    // Validation basique pour éviter S8476 (Server-Side Request Forgery / Path Traversal)
-    if (String(auditId).includes('..') || String(auditId).includes('/') || String(auditId).includes('\\')) {
-        throw new Error("Erreur: ID d'audit invalide détecté.");
+    // Validation stricte pour éviter S7044 et S8476 (Path Traversal / SSRF)
+    if (!/^[a-zA-Z0-9-]+$/.test(String(auditId))) {
+        throw new Error("Erreur: Format de l'ID d'audit invalide détecté.");
     }
 
     console.log(`    => Demande d'audit créée: "${auditData.title}" avec l'ID: ${auditId}`);
