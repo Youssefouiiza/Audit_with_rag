@@ -204,6 +204,20 @@ function AuditInfoSidebar({ user, audit, statusCfg, changingStatus, assigning, a
 }
 
 function RAGAnalysisCard({ aiResult, id }: any) {
+  let scoreColorText = 'text-green-400';
+  let scoreColorBadge = 'bg-green-500/10 text-green-400';
+  let scoreColorBar = 'bg-green-500';
+
+  if (aiResult?.riskScore > 70) {
+    scoreColorText = 'text-red-400';
+    scoreColorBadge = 'bg-red-500/10 text-red-400';
+    scoreColorBar = 'bg-red-500';
+  } else if (aiResult?.riskScore > 40) {
+    scoreColorText = 'text-yellow-400';
+    scoreColorBadge = 'bg-yellow-500/10 text-yellow-400';
+    scoreColorBar = 'bg-yellow-500';
+  }
+
   return (
     <div className="glass rounded-2xl p-6 space-y-4 border border-indigo-500/20">
       <h2 className="font-semibold text-[var(--foreground)] flex items-center gap-2">
@@ -212,18 +226,18 @@ function RAGAnalysisCard({ aiResult, id }: any) {
       {aiResult ? (
         <div className="space-y-4">
           <div className="flex items-center gap-4">
-            <div className={`text-4xl font-bold ${aiResult.riskScore > 70 ? 'text-red-400' : aiResult.riskScore > 40 ? 'text-yellow-400' : 'text-green-400'}`}>
+            <div className={`text-4xl font-bold ${scoreColorText}`}>
               {aiResult.riskScore}
             </div>
             <div>
               <p className="text-xs text-[var(--muted-foreground)]">Score de Risque</p>
-              <span className={`text-xs font-medium px-2 py-0.5 rounded ${aiResult.riskScore > 70 ? 'bg-red-500/10 text-red-400' : aiResult.riskScore > 40 ? 'bg-yellow-500/10 text-yellow-400' : 'bg-green-500/10 text-green-400'}`}>
+              <span className={`text-xs font-medium px-2 py-0.5 rounded ${scoreColorBadge}`}>
                 {aiResult.riskLevel}
               </span>
             </div>
           </div>
           <div className="w-full h-2 rounded-full bg-[var(--muted)]">
-            <div className={`h-2 rounded-full transition-all ${aiResult.riskScore > 70 ? 'bg-red-500' : aiResult.riskScore > 40 ? 'bg-yellow-500' : 'bg-green-500'}`}
+            <div className={`h-2 rounded-full transition-all ${scoreColorBar}`}
               style={{ width: `${aiResult.riskScore}%` }} />
           </div>
           <div className="bg-[var(--muted)]/50 rounded-xl p-3">
