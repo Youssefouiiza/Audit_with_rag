@@ -112,7 +112,8 @@ async function runSimulation() {
 
     // 6. Assign Auditor as Manager
     console.log("\n[6] Le Manager affecte un auditeur à cette demande...");
-    res = await fetch(`${API_URL}/audits/${auditId}/assign`, {
+    const safeAuditId = encodeURIComponent(auditId);
+    res = await fetch(`${API_URL}/audits/${safeAuditId}/assign`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
