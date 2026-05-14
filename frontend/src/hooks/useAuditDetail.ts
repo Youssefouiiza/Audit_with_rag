@@ -94,7 +94,7 @@ export function useAuditDetail(id: string, user: any) {
       attempts++;
       try {
         const ai = await apiFetch(`/api/ai/result/${id}`);
-        if (ai && ai.summary) {
+        if (ai?.summary) {
           setAiResult(ai);
           setAnalyzing(false);
           clearInterval(interval);
