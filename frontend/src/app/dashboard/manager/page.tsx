@@ -6,8 +6,8 @@ import { apiFetch } from '@/lib/api';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import {
-  FileText, Clock, CheckCircle, Activity, Users, UserCheck,
-  ArrowRight, TrendingUp, AlertCircle, RefreshCw
+  FileText, Clock, CheckCircle, UserCheck,
+  ArrowRight, AlertCircle, RefreshCw, Target, Award, TrendingUp
 } from 'lucide-react';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -18,44 +18,28 @@ const STATUS_COLORS: Record<string, string> = {
   COMPLETED: 'bg-green-500/10 text-green-400 border border-green-500/20',
   CANCELLED: 'bg-red-500/10 text-red-400 border border-red-500/20',
 };
-
 const STATUS_LABELS: Record<string, string> = {
-  DRAFT: 'Brouillon',
-  PENDING: 'En attente',
-  IN_PROGRESS: 'En cours',
-  AWAITING_DOCS: 'Docs manquants',
-  COMPLETED: 'Terminé',
-  CANCELLED: 'Annulé',
+  DRAFT: 'Brouillon', PENDING: 'En attente', IN_PROGRESS: 'En cours',
+  AWAITING_DOCS: 'Docs manquants', COMPLETED: 'Terminé', CANCELLED: 'Annulé',
 };
 
 const PROGRESS_STEPS = [
-  { key: 'DRAFT', label: 'Soumis', step: 1 },
-  { key: 'PENDING', label: 'En attente', step: 2 },
-  { key: 'IN_PROGRESS', label: 'En cours', step: 3 },
-  { key: 'COMPLETED', label: 'Terminé', step: 4 },
+  { key: 'DRAFT', label: 'Reçu', step: 1 },
+  { key: 'IN_PROGRESS', label: 'En cours', step: 2 },
+  { key: 'PENDING', label: 'Révision', step: 3 },
+  { key: 'COMPLETED', label: 'Livré', step: 4 },
 ];
 
-function ProgressBar({ status }: { status: string }) {
-  const current = PROGRESS_STEPS.find(s => s.key === status)?.step ?? 1;
-  return (
-    <div className="flex items-center gap-1 mt-2">
-      {PROGRESS_STEPS.map((s, i) => (
-        <div key={s.key} className="flex items-center gap-1 flex-1">
-          <div className={`h-1.5 flex-1 rounded-full transition-all ${s.step <= current ? 'bg-blue-500' : 'bg-[var(--border)]'}`} />
-          {i < PROGRESS_STEPS.length - 1 && <div className={`h-1.5 w-1.5 rounded-full ${s.step < current ? 'bg-blue-500' : 'bg-[var(--border)]'}`} />}
-        </div>
-      ))}
-    </div>
-  );
-}
+
 
 export default function ManagerDashboard() {
   useAuth(['MANAGER', 'ADMIN']);
   const [audits, setAudits] = useState<any[]>([]);
   const [auditors, setAuditors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'attribution' | 'suivi'>('attribution');
+  const [activeTab, setActiveTab] = useState<'attribution' | 'suivi' | 'validation'>('attribution');
   const [assigning, setAssigning] = useState<string | null>(null);
+  const [changingStatus, setChangingStatus] = useState<string | null>(null);
 
   useEffect(() => { loadData(); }, []);
 
@@ -76,61 +60,69 @@ export default function ManagerDashboard() {
     if (!auditorId) return;
     setAssigning(auditId);
     try {
-      await apiFetch(`/api/audits/${auditId}/assign`, {
-        method: 'POST',
-        body: JSON.stringify({ auditorId }),
-      });
+      await apiFetch(`/api/audits/${auditId}/assign`, { method: 'POST', body: JSON.stringify({ auditorId }) });
       toast.success('Auditeur assigné avec succès');
       loadData();
     } catch (e: any) { toast.error(e.message); }
     finally { setAssigning(null); }
   };
 
-  const changeStatus = async (auditId: string, newStatus: string) => {
+  const validateAudit = async (auditId: string, newStatus: string) => {
+    setChangingStatus(auditId);
     try {
       await apiFetch(`/api/audits/${auditId}/status/${newStatus}`, { method: 'PATCH' });
-      toast.success('Statut mis à jour');
+      toast.success(newStatus === 'COMPLETED' ? '✅ Rapport validé et livré au client !' : 'Statut mis à jour');
       loadData();
     } catch (e: any) { toast.error(e.message); }
+    finally { setChangingStatus(null); }
   };
 
   const unassigned = audits.filter(a => !a.auditorName);
-  const inProgress = audits.filter(a => a.status === 'IN_PROGRESS');
-  const completed = audits.filter(a => a.status === 'COMPLETED');
+  const inProgress  = audits.filter(a => a.status === 'IN_PROGRESS');
+  const pending     = audits.filter(a => a.status === 'PENDING');
+  const completed   = audits.filter(a => a.status === 'COMPLETED');
 
-  const stats = [
-    { label: 'Total Audits', value: audits.length, icon: FileText, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-    { label: 'Non Assignés', value: unassigned.length, icon: AlertCircle, color: 'text-orange-400', bg: 'bg-orange-500/10' },
-    { label: 'En Cours', value: inProgress.length, icon: Activity, color: 'text-indigo-400', bg: 'bg-indigo-500/10' },
-    { label: 'Terminés', value: completed.length, icon: CheckCircle, color: 'text-green-400', bg: 'bg-green-500/10' },
+
+
+  const globalCompletionRate = audits.length > 0
+    ? Math.round((completed.length / audits.length) * 100) : 0;
+
+  const kpi = [
+    { label: 'Total Dossiers',    value: audits.length,      icon: FileText,    color: 'text-blue-400',   bg: 'bg-blue-500/10' },
+    { label: 'Non Assignés',      value: unassigned.length,  icon: AlertCircle, color: 'text-orange-400', bg: 'bg-orange-500/10' },
+    { label: 'En révision',       value: pending.length,     icon: Clock,       color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
+    { label: 'Taux de livraison', value: `${globalCompletionRate}%`, icon: TrendingUp, color: 'text-green-400', bg: 'bg-green-500/10' },
   ];
 
-  // Group audits by auditor for the suivi tab
-  const byAuditor: Record<string, { auditor: string; audits: any[] }> = {};
-  audits.forEach(a => {
-    const key = a.auditorName || '__unassigned__';
-    if (!byAuditor[key]) byAuditor[key] = { auditor: a.auditorName || 'Non assigné', audits: [] };
-    byAuditor[key].audits.push(a);
-  });
+  const tabs = [
+    { key: 'attribution', label: 'Attribution', icon: UserCheck },
+    { key: 'validation',  label: 'Validation Qualité', icon: CheckCircle },
+  ] as const;
 
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Tableau de bord Manager</h1>
-          <p className="text-[var(--muted-foreground)] text-sm mt-1">Attribution des auditeurs et suivi d&apos;avancement</p>
+          <div className="flex items-center gap-3 mb-1">
+            <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
+              <Target className="h-5 w-5 text-blue-400" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Centre de Pilotage Manager</h1>
+          </div>
+          <p className="text-[var(--muted-foreground)] text-sm">
+            Attribution · Suivi performance · Validation qualité des rapports
+          </p>
         </div>
         <button onClick={loadData}
           className="flex items-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] text-sm glass px-3 py-2 rounded-xl transition-all">
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Actualiser
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Actualiser
         </button>
       </div>
 
-      {/* Stats */}
+      {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map(s => (
+        {kpi.map(s => (
           <div key={s.label} className="glass rounded-2xl p-5 flex items-center gap-4">
             <div className={`h-12 w-12 rounded-xl ${s.bg} flex items-center justify-center flex-shrink-0`}>
               <s.icon className={`h-6 w-6 ${s.color}`} />
@@ -144,38 +136,38 @@ export default function ManagerDashboard() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 glass rounded-xl p-1 w-fit">
-        <button
-          onClick={() => setActiveTab('attribution')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'attribution' ? 'bg-blue-600 text-white shadow-lg' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'}`}>
-          <UserCheck className="h-4 w-4" />
-          Attribution
-        </button>
-        <button
-          onClick={() => setActiveTab('suivi')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'suivi' ? 'bg-blue-600 text-white shadow-lg' : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'}`}>
-          <TrendingUp className="h-4 w-4" />
-          Suivi d&apos;avancement
-        </button>
+      <div className="flex gap-1 glass rounded-xl p-1 w-fit flex-wrap">
+        {tabs.map(t => (
+          <button key={t.key} onClick={() => setActiveTab(t.key)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+              activeTab === t.key
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+            }`}>
+            <t.icon className="h-4 w-4" /> {t.label}
+          </button>
+        ))}
       </div>
 
-      {/* Tab: Attribution */}
+      {/* === ATTRIBUTION === */}
       {activeTab === 'attribution' && (
         <div className="glass rounded-2xl overflow-hidden">
           <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between">
             <div>
-              <h2 className="font-semibold text-[var(--foreground)]">Attribution Auditeur ↔ Client</h2>
-              <p className="text-xs text-[var(--muted-foreground)] mt-0.5">Assignez un auditeur à chaque dossier client</p>
+              <h2 className="font-semibold text-[var(--foreground)]">Attribution Intelligente des Dossiers</h2>
+              <p className="text-xs text-[var(--muted-foreground)] mt-0.5">Assignez un auditeur expert à chaque mission client</p>
             </div>
-            <span className="text-xs text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2.5 py-1 rounded-lg">
-              {unassigned.length} dossier(s) sans auditeur
-            </span>
+            {unassigned.length > 0 && (
+              <span className="text-xs text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2.5 py-1 rounded-lg animate-pulse">
+                ⚠ {unassigned.length} dossier(s) sans auditeur
+              </span>
+            )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--border)] bg-[var(--muted)]/30">
-                  {['Dossier', 'Client', 'Statut', 'Auditeur actuel', 'Affecter un auditeur', 'Actions'].map(h => (
+                  {['Dossier', 'Client', 'Statut', 'Auditeur actuel', 'Affecter / Réaffecter', 'Actions'].map(h => (
                     <th key={h} className="text-left px-6 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
@@ -184,7 +176,7 @@ export default function ManagerDashboard() {
                 {loading ? (
                   <tr><td colSpan={6} className="text-center py-12 text-[var(--muted-foreground)]">Chargement...</td></tr>
                 ) : audits.length === 0 ? (
-                  <tr><td colSpan={6} className="text-center py-12 text-[var(--muted-foreground)]">Aucun audit trouvé</td></tr>
+                  <tr><td colSpan={6} className="text-center py-12 text-[var(--muted-foreground)]">Aucun audit</td></tr>
                 ) : audits.map(a => (
                   <tr key={a.id} className={`border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/30 transition-colors ${!a.auditorName ? 'bg-orange-500/5' : ''}`}>
                     <td className="px-6 py-4">
@@ -222,12 +214,10 @@ export default function ManagerDashboard() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <select
-                          defaultValue=""
-                          onChange={e => assignAuditor(a.id, e.target.value)}
+                        <select defaultValue="" onChange={e => assignAuditor(a.id, e.target.value)}
                           disabled={assigning === a.id}
                           className="bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] rounded-xl px-3 py-1.5 text-xs outline-none focus:border-blue-500 transition-all min-w-[140px]">
-                          <option value="">{a.auditorName ? 'Changer…' : 'Choisir…'}</option>
+                          <option value="">{a.auditorName ? 'Réaffecter…' : 'Choisir…'}</option>
                           {auditors.map(aud => (
                             <option key={aud.id} value={aud.id}>{aud.fullName}</option>
                           ))}
@@ -248,58 +238,93 @@ export default function ManagerDashboard() {
         </div>
       )}
 
-      {/* Tab: Suivi d'avancement */}
-      {activeTab === 'suivi' && (
-        <div className="space-y-4">
-          <div className="glass rounded-2xl p-5">
-            <h2 className="font-semibold text-[var(--foreground)] mb-4 flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-blue-400" />
-              Avancement par auditeur
+
+
+      {/* === VALIDATION QUALITÉ === */}
+      {activeTab === 'validation' && (
+        <div className="space-y-5">
+          <div className="glass rounded-2xl p-5 border border-yellow-500/20">
+            <h2 className="font-semibold text-[var(--foreground)] flex items-center gap-2 mb-1">
+              <CheckCircle className="h-5 w-5 text-yellow-400" /> Rapports en attente de validation qualité
             </h2>
-            {loading ? (
-              <div className="text-center py-8 text-[var(--muted-foreground)]">Chargement...</div>
-            ) : Object.keys(byAuditor).length === 0 ? (
-              <div className="text-center py-8 text-[var(--muted-foreground)]">Aucun audit</div>
+            <p className="text-xs text-[var(--muted-foreground)] mb-5">
+              Ces dossiers sont en statut &quot;En révision&quot; — validez ou renvoyez-les en correction avant livraison officielle au client.
+            </p>
+            {pending.length === 0 ? (
+              <div className="py-10 text-center space-y-3">
+                <CheckCircle className="h-12 w-12 mx-auto text-green-400/30" />
+                <p className="text-[var(--muted-foreground)]">Aucun rapport en attente de validation</p>
+                <p className="text-xs text-[var(--muted-foreground)]/60">Tous les rapports ont été validés ou sont encore en cours d&apos;analyse</p>
+              </div>
             ) : (
-              <div className="space-y-6">
-                {Object.entries(byAuditor).map(([key, { auditor, audits: auditorAudits }]) => (
-                  <div key={key} className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold ${key === '__unassigned__' ? 'bg-orange-500/20 text-orange-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                        {key === '__unassigned__' ? '?' : auditor[0]}
-                      </div>
-                      <div>
-                        <p className="font-medium text-[var(--foreground)] text-sm">{auditor}</p>
-                        <p className="text-xs text-[var(--muted-foreground)]">{auditorAudits.length} dossier(s)</p>
-                      </div>
+              <div className="space-y-3">
+                {pending.map(a => (
+                  <div key={a.id} className="glass rounded-xl p-5 border border-[var(--border)] flex items-center gap-4 flex-wrap">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-[var(--foreground)]">{a.title}</p>
+                      <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
+                        Client: {a.clientName} · Auditeur: {a.auditorName || 'Non assigné'}
+                      </p>
+                      {a.deadline && (
+                        <p className="text-xs text-orange-400 mt-0.5">
+                          ⏰ Échéance : {new Date(a.deadline).toLocaleDateString('fr-FR')}
+                        </p>
+                      )}
                     </div>
-                    <div className="space-y-2 pl-11">
-                      {auditorAudits.map(a => (
-                        <div key={a.id} className="glass rounded-xl p-4">
-                          <div className="flex items-center justify-between mb-1">
-                            <div>
-                              <p className="text-sm font-medium text-[var(--foreground)]">{a.title}</p>
-                              <p className="text-xs text-[var(--muted-foreground)]">Client: {a.clientName}</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className={`px-2 py-0.5 rounded-lg text-xs font-medium ${STATUS_COLORS[a.status] || ''}`}>
-                                {STATUS_LABELS[a.status] || a.status}
-                              </span>
-                              <Link href={`/audit/${a.id}`} className="text-blue-400 text-xs hover:underline">Voir →</Link>
-                            </div>
-                          </div>
-                          <ProgressBar status={a.status} />
-                          <div className="flex justify-between text-xs text-[var(--muted-foreground)] mt-1.5">
-                            {PROGRESS_STEPS.map(s => <span key={s.key}>{s.label}</span>)}
-                          </div>
-                        </div>
-                      ))}
+                    <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+                      <Link href={`/audit/${a.id}`}
+                        className="flex items-center gap-1.5 px-3 py-2 glass border border-[var(--border)] rounded-xl text-xs text-[var(--foreground)] hover:border-blue-500 transition-all">
+                        <ArrowRight className="h-3.5 w-3.5" /> Consulter le rapport
+                      </Link>
+                      <button
+                        onClick={() => validateAudit(a.id, 'IN_PROGRESS')}
+                        disabled={changingStatus === a.id}
+                        className="px-3 py-2 rounded-xl text-xs font-medium bg-orange-500/10 text-orange-400 border border-orange-500/20 hover:bg-orange-500/20 transition-all disabled:opacity-50">
+                        ↩ Renvoyer en correction
+                      </button>
+                      <button
+                        onClick={() => validateAudit(a.id, 'COMPLETED')}
+                        disabled={changingStatus === a.id}
+                        className="px-4 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:opacity-90 transition-all shadow-lg shadow-green-500/20 disabled:opacity-50 flex items-center gap-1.5">
+                        {changingStatus === a.id
+                          ? <span className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          : <CheckCircle className="h-3.5 w-3.5" />
+                        }
+                        Valider & Livrer
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
+
+          {/* Recently validated */}
+          {completed.length > 0 && (
+            <div className="glass rounded-2xl p-5 border border-green-500/20">
+              <h2 className="font-semibold text-green-400 flex items-center gap-2 mb-3">
+                <Award className="h-5 w-5" /> Rapports validés et livrés ({completed.length})
+              </h2>
+              <div className="space-y-2">
+                {completed.slice(0, 5).map(a => (
+                  <div key={a.id} className="flex items-center justify-between gap-3 px-4 py-3 bg-green-500/5 rounded-xl border border-green-500/10">
+                    <div>
+                      <p className="text-sm font-medium text-[var(--foreground)]">{a.title}</p>
+                      <p className="text-xs text-[var(--muted-foreground)]">Client: {a.clientName} · Auditeur: {a.auditorName}</p>
+                    </div>
+                    <span className="text-xs font-medium text-green-400 bg-green-500/10 px-2.5 py-1 rounded-lg border border-green-500/20">
+                      ✓ Livré
+                    </span>
+                  </div>
+                ))}
+                {completed.length > 5 && (
+                  <p className="text-xs text-center text-[var(--muted-foreground)] pt-1">
+                    +{completed.length - 5} autres rapports livrés
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

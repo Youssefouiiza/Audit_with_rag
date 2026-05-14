@@ -254,7 +254,7 @@ export default function AuditDetailPage() {
     <div className="space-y-6">
       <AuditHeader audit={audit} id={id} statusCfg={statusCfg} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className={`grid grid-cols-1 ${user?.role === 'AUDITOR' ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-6`}>
         <AuditInfoSidebar
           user={user}
           audit={audit}
@@ -269,7 +269,7 @@ export default function AuditDetailPage() {
           onAssignAuditor={assignAuditor}
         />
 
-        <RAGAnalysisCard aiResult={aiResult} id={id} />
+        {user?.role === 'AUDITOR' && <RAGAnalysisCard aiResult={aiResult} id={id} />}
 
         <DocumentManagerCard
           docs={docs}

@@ -25,6 +25,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+# Fix: Disable low_cpu_mem_usage default to prevent
+# "Cannot copy out of meta tensor" error in newer transformers
+try:
+    import transformers.modeling_utils
+    if hasattr(transformers.modeling_utils, 'LOW_CPU_MEM_USAGE_DEFAULT'):
+        transformers.modeling_utils.LOW_CPU_MEM_USAGE_DEFAULT = False
+except Exception:
+    pass
+
 # python-docx pour la génération de rapports Word
 try:
     from docx import Document as DocxDocument
@@ -142,14 +151,7 @@ def get_vectorstore():
     if not db_path.exists():
         return None
     try:
-        # Fix: Disable low_cpu_mem_usage default to prevent
-        # "Cannot copy out of meta tensor" error in newer transformers
-        try:
-            import transformers.modeling_utils
-            if hasattr(transformers.modeling_utils, 'LOW_CPU_MEM_USAGE_DEFAULT'):
-                transformers.modeling_utils.LOW_CPU_MEM_USAGE_DEFAULT = False
-        except Exception:
-            pass
+        # (Patch moved to top of file)
 
         from langchain_community.embeddings import HuggingFaceEmbeddings
         from langchain_community.vectorstores import Chroma

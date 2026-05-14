@@ -28,7 +28,7 @@ const SEV_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: 
 };
 
 export default function AnalysePage() {
-  useAuth();
+  useAuth(['AUDITOR']);
   const { id } = useParams() as { id: string };
   const [audit, setAudit] = useState<any>(null);
   const [docs, setDocs] = useState<any[]>([]);
@@ -518,14 +518,4 @@ function RecommendationsList({ recommendations }: { recommendations: any[] }) {
     </div>
   );
 }
-rt Word Complet
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+

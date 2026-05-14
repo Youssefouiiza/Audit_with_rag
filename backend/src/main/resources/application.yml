@@ -27,6 +27,12 @@ spring:
           auth: true
           starttls:
             enable: true
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASS:guest}
+    virtual-host: /
 
 server:
   port: 8080
@@ -66,6 +72,8 @@ app:
   client-doc-quota-mb: 500
   rate-limit:
     auth-per-minute: 10
+  rag:
+    base-url: ${RAG_BASE_URL:http://localhost:8000}
 
 management:
   endpoints:
@@ -85,3 +93,4 @@ springdoc:
 logging:
   pattern:
     console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} [%thread] %-5level [%X{correlationId}] %logger{36} - %msg%n"
+
