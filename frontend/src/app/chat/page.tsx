@@ -7,6 +7,7 @@ import { apiFetch } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/useAuthStore';
 import { Send, MessageSquare, Hash, RefreshCw, Loader2 } from 'lucide-react';
+import { useChatRoom } from '@/hooks/useChatRoom';
 
 export default function ChatPage() {
   useAuth();
@@ -14,126 +15,10 @@ export default function ChatPage() {
   const rawAuditId = searchParams?.get('auditId');
 
   const { user } = useAuthStore();
-  const [messages, setMessages] = useState<any[]>([]);
-  const [room, setRoom] = useState<any | null>(null);
-  const [inputText, setInputText] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
-  const [myAudits, setMyAudits] = useState<any[]>([]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Load the list of possible chats if no specific chat is requested
-  useEffect(() => {
-    if (!rawAuditId) {
-      loadMyAudits();
-    }
-  }, [rawAuditId]);
-
-  const loadMyAudits = async () => {
-    try {
-      const res = await apiFetch('/api/audits/mine?size=100');
-      setMyAudits(res?.content || []);
-    } catch { /* ignore */ }
-    finally { setLoading(false); }
-  };
-
-  // Load or create the chat room for this audit
-  const loadRoom = async () => {
-    setLoading(true);
-    try {
-      if (!rawAuditId) {
-        toast.error('Aucun audit spécifié pour ce chat');
-        setLoading(false);
-        return;
-      }
-      const r = await apiFetch(`/api/chat/room/audit/${rawAuditId}`);
-      setRoom(r);
-      if (r?.id) {
-        await loadMessages(r.id);
-      }
-    } catch (e: any) {
-      toast.error('Impossible de charger le salon : ' + e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadMessages = async (roomId: string) => {
-    try {
-      const res = await apiFetch(`/api/chat/rooms/${roomId}/messages?size=100&sort=createdAt,asc`);
-      let msgs = res?.content ?? (Array.isArray(res) ? res : []);
-      // Ensure messages are sorted chronologically (oldest at the top, newest strictly at the bottom)
-      msgs.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      setMessages(msgs);
-    } catch { /* ignore */ }
-  };
-
-  // Auto-refresh: poll for new messages every 5 seconds
-  useEffect(() => {
-    if (!room?.id) return;
-    const interval = setInterval(() => {
-      loadMessages(room.id);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [room?.id]);
-
-  useEffect(() => { loadRoom(); }, [rawAuditId]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputText.trim() || !room?.id) return;
-    setSending(true);
-
-    // Send via REST (WebSocket is optional enhancement)
-    // The backend WebSocket endpoint is @MessageMapping("/chat.send/{roomId}")
-    // We use REST fallback: POST directly via STOMP if available, or add a REST endpoint
-    // Since no REST POST for messages exists, we'll use the WebSocket via a simple approach
-    // Optimistically add message and try to send
-    const tempMsg = {
-      id: `temp-${Date.now()}`,
-      senderId: user?.id,
-      senderName: user?.fullName,
-      content: inputText,
-      createdAt: new Date().toISOString(),
-      messageType: 'TEXT',
-    };
-    setMessages(prev => [...prev, tempMsg]);
-    const textToSend = inputText;
-    setInputText('');
-
-    try {
-      // Use STOMP/WebSocket via raw fetch to our WebSocket bridge
-      // Alternatively, add a REST endpoint — let's call the backend directly
-      const token = JSON.parse(sessionStorage.getItem('audit-auth-storage') || '{}')?.state?.token;
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-      const res = await fetch(`${apiUrl}/api/chat/rooms/${room.id}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ roomId: room.id, content: textToSend, messageType: 'TEXT' }),
-      });
-      if (res.ok) {
-        const saved = await res.json();
-        // Replace temp message with real one
-        setMessages(prev => prev.map(m => m.id === tempMsg.id ? saved : m));
-      } else {
-        // Remove temp message on failure
-        setMessages(prev => prev.filter(m => m.id !== tempMsg.id));
-        toast.error('Envoi échoué');
-      }
-    } catch {
-      setMessages(prev => prev.filter(m => m.id !== tempMsg.id));
-      toast.error('Erreur de connexion');
-    } finally {
-      setSending(false);
-    }
-  };
+  const {
+    messages, room, inputText, setInputText, loading, sending, myAudits, messagesEndRef,
+    handleSend, loadRoom
+  } = useChatRoom(rawAuditId, user);
 
   if (!rawAuditId) {
     return (
