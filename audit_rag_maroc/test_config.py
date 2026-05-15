@@ -1,6 +1,6 @@
 import os
 import pytest
-from audit_rag_maroc import config
+import config
 
 def test_config_defaults():
     # Test that default values are correctly loaded

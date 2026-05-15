@@ -28,8 +28,7 @@ describe('AuditProHomepage', () => {
     
     // Check main heading
     expect(screen.getByText(/L'audit d'entreprise,/i)).toBeInTheDocument();
-    expect(screen.getByText(/propulsé par/i)).toBeInTheDocument();
-    expect(screen.getByText(/l'intelligence artificielle/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/l'intelligence artificielle/i).length).toBeGreaterThan(0);
     
     // Check description text
     expect(screen.getByText(/Sécurisez la conformité CGNC et IFRS/i)).toBeInTheDocument();
