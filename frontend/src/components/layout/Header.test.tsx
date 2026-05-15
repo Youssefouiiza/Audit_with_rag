@@ -1,15 +1,15 @@
 import { render, screen, act, fireEvent } from '@testing-library/react';
 import { Header } from './Header';
-import { useAuthStore } from '@/store/useAuthStore';
-import { apiFetch } from '@/lib/api';
+import { useAuthStore } from '../../store/useAuthStore';
+import { apiFetch } from '../../lib/api';
 import { useRouter } from 'next/navigation';
 
 // Mock dependencies
-jest.mock('@/store/useAuthStore', () => ({
+jest.mock('../../store/useAuthStore', () => ({
   useAuthStore: jest.fn(),
 }));
 
-jest.mock('@/lib/api', () => ({
+jest.mock('../../lib/api', () => ({
   apiFetch: jest.fn(),
 }));
 
