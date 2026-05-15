@@ -17,6 +17,9 @@ const customJestConfig = {
     '!src/**/*.d.ts',
     '!src/app/layout.tsx', // Exclude layout or Next.js specific boilerplates if needed
   ],
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
+  },
 }
 
 module.exports = createJestConfig(customJestConfig)

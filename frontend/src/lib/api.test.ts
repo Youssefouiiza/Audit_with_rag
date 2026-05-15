@@ -25,8 +25,11 @@ describe('apiFetch', () => {
     Object.defineProperty(window, 'sessionStorage', { value: storageMock, writable: true });
     
     // Mock window.location
-    delete (window as any).location;
-    window.location = { href: '' } as any;
+    Object.defineProperty(window, 'location', {
+      value: { href: 'http://localhost/' },
+      writable: true,
+      configurable: true
+    });
   });
 
   it('adds authorization header when token exists', async () => {
