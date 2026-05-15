@@ -277,6 +277,15 @@ export default function AuditorDashboard() {
                 {filtered.map(a => (
                   <div key={a.id}
                     onClick={() => { setSelectedAudit(a); setAiSummary(null); }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedAudit(a);
+                        setAiSummary(null);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
                     className={`px-5 py-4 cursor-pointer transition-colors hover:bg-[var(--muted)]/30 ${selectedAudit?.id === a.id ? 'bg-purple-500/10 border-l-2 border-purple-500' : ''}`}>
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div className="flex-1 min-w-0">
