@@ -61,13 +61,27 @@ jobs:
         working-directory: ./audit_rag_maroc
         continue-on-error: true
 
-      # 4. Run SonarCloud Scanner
+      # 4. Verify coverage files exist
+      - name: Debug - List coverage files
+        run: |
+          echo "=== Frontend coverage ==="
+          ls -la frontend/coverage/ || echo "No frontend coverage directory"
+          head -5 frontend/coverage/lcov.info || echo "No lcov.info"
+          echo "=== Python coverage ==="
+          ls -la audit_rag_maroc/coverage.xml || echo "No Python coverage.xml"
+          echo "=== Java coverage ==="
+          ls -la backend/target/site/jacoco/jacoco.xml || echo "No JaCoCo report"
+
+      # 5. Run SonarCloud Scanner
       - name: Analyze with SonarCloud
         uses: SonarSource/sonarcloud-github-action@4006f663ecaf1f8093e8e4abb9227f6041f52216
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >
-            -Dsonar.projectKey=Youssefouiiza_New_audit 
+            -Dsonar.projectKey=Youssefouiiza_New_audit
             -Dsonar.organization=youssefouiiza
+            -Dsonar.javascript.lcov.reportPaths=frontend/coverage/lcov.info
+            -Dsonar.python.coverage.reportPaths=audit_rag_maroc/coverage.xml
+            -Dsonar.coverage.jacoco.xmlReportPaths=backend/target/site/jacoco/jacoco.xml
           projectBaseDir: .
