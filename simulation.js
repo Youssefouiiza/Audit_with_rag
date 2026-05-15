@@ -10,7 +10,7 @@ const password = process.env.TEST_PASSWORD || (Math.random().toString(36).slice(
 async function runSimulation() {
   try {
     console.log("=== Démarrage de la simulation ===");
-    
+
     // 1. Login as Admin
     console.log("\n[1] Connexion en tant qu'administrateur...");
     // Avoid literal hardcoded credentials to clear SonarQube vulnerability
@@ -21,8 +21,8 @@ async function runSimulation() {
       body: JSON.stringify({ email: "admin@audit.local", password: adminPassword })
     });
     if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error("Erreur de connexion admin: " + res.status + " " + errorText);
+      const errorText = await res.text();
+      throw new Error("Erreur de connexion admin: " + res.status + " " + errorText);
     }
     let adminTokens = await res.json();
     const adminToken = adminTokens.accessToken;
@@ -35,21 +35,21 @@ async function runSimulation() {
       { email: managerEmail, fullName: "Manager Test", role: "MANAGER", temporaryPassword: password },
       { email: auditorEmail, fullName: "Auditor Test", role: "AUDITOR", temporaryPassword: password }
     ];
-    
+
     const userIds = {};
 
     for (let req of createReqs) {
       res = await fetch(`${API_URL}/users`, {
         method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${adminToken}`
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`
         },
         body: JSON.stringify(req)
       });
       if (!res.ok) {
-          const errText = await res.text();
-          throw new Error(`Erreur lors de la création de ${req.email}: ${res.status} ${errText}`);
+        const errText = await res.text();
+        throw new Error(`Erreur lors de la création de ${req.email}: ${res.status} ${errText}`);
       }
       const data = await res.json();
       userIds[req.role] = data.id;
@@ -72,7 +72,7 @@ async function runSimulation() {
     console.log("\n[4] Le Client soumet une demande d'audit...");
     res = await fetch(`${API_URL}/audits`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${clientToken}`
       },
@@ -82,17 +82,17 @@ async function runSimulation() {
       })
     });
     if (!res.ok) {
-        const errDesc = await res.text();
-        throw new Error("Erreur lors de la création de l'audit: " + res.status + " " + errDesc);
+      const errDesc = await res.text();
+      throw new Error("Erreur lors de la création de l'audit: " + res.status + " " + errDesc);
     }
     const auditData = await res.json();
     const auditId = auditData.id;
     if (!auditId) {
-        throw new Error("Erreur: ID d'audit non reçu du serveur.");
+      throw new Error("Erreur: ID d'audit non reçu du serveur.");
     }
     // Validation stricte pour éviter S7044 et S8476 (Path Traversal / SSRF)
     if (!/^[a-zA-Z0-9-]+$/.test(String(auditId))) {
-        throw new Error("Erreur: Format de l'ID d'audit invalide détecté.");
+      throw new Error("Erreur: Format de l'ID d'audit invalide détecté.");
     }
 
     console.log(`    => Demande d'audit créée: "${auditData.title}" avec l'ID: ${auditId}`);
@@ -115,7 +115,7 @@ async function runSimulation() {
     const safeAuditId = encodeURIComponent(auditId);
     res = await fetch(`${API_URL}/audits/${safeAuditId}/assign`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${managerToken}`
       },
@@ -125,8 +125,8 @@ async function runSimulation() {
       })
     });
     if (!res.ok) {
-        const errDesc = await res.text();
-        throw new Error("Erreur lors de l'affectation: " + errDesc);
+      const errDesc = await res.text();
+      throw new Error("Erreur lors de l'affectation: " + errDesc);
     }
     const assignedAudit = await res.json();
     console.log(`    => Affectation réussie!`);
