@@ -86,14 +86,16 @@ async function runSimulation() {
       throw new Error("Erreur lors de la création de l'audit: " + res.status + " " + errDesc);
     }
     const auditData = await res.json();
-    const auditId = auditData.id;
-    if (!auditId) {
+    const rawAuditId = auditData.id;
+    if (!rawAuditId) {
       throw new Error("Erreur: ID d'audit non reçu du serveur.");
     }
     // Validation stricte pour éviter S7044 et S8476 (Path Traversal / SSRF)
-    if (!/^[a-zA-Z0-9-]+$/.test(String(auditId))) {
+    const match = String(rawAuditId).match(/^[a-zA-Z0-9-]+$/);
+    if (!match) {
       throw new Error("Erreur: Format de l'ID d'audit invalide détecté.");
     }
+    const auditId = match[0];
 
     console.log(`    => Demande d'audit créée: "${auditData.title}" avec l'ID: ${auditId}`);
     console.log(`    => Statut de l'audit: ${auditData.status}`);
