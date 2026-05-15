@@ -8,7 +8,7 @@ def test_config_defaults():
     assert config.CHUNK_OVERLAP == 200
     assert config.RETRIEVAL_K == 8
     assert config.RETRIEVAL_TYPE == "mmr"
-    assert config.TEMPERATURE == 0.0
+    assert config.TEMPERATURE == pytest.approx(0.0)
 
 def test_available_models():
     # Test that default models are present
