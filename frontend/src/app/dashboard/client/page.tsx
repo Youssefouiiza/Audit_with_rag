@@ -196,16 +196,17 @@ export default function ClientDashboard() {
           <form onSubmit={createAudit} className="space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1.5">Titre de la mission *</label>
-                <input type="text" required placeholder="ex: Audit comptable exercice 2025"
+                <label htmlFor="audit-title" className="block text-xs font-medium text-[var(--muted-foreground)] mb-1.5">Titre de la mission *</label>
+                <input id="audit-title" type="text" required placeholder="ex: Audit comptable exercice 2025"
                   value={formData.title}
                   onChange={e => setFormData({ ...formData, title: e.target.value })}
                   className="w-full bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1.5">Échéance souhaitée</label>
+                <label htmlFor="audit-deadline" className="block text-xs font-medium text-[var(--muted-foreground)] mb-1.5">Échéance souhaitée</label>
                 <div className="relative">
                   <DatePicker
+                    id="audit-deadline"
                     selected={formData.deadline ? new Date(formData.deadline) : null}
                     onChange={(date: Date | null) => {
                       if (date) {
@@ -225,8 +226,8 @@ export default function ClientDashboard() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1.5">Description & objectifs *</label>
-              <textarea required placeholder="Décrivez le périmètre, les exercices concernés, les problématiques…"
+              <label htmlFor="audit-description" className="block text-xs font-medium text-[var(--muted-foreground)] mb-1.5">Description & objectifs *</label>
+              <textarea id="audit-description" required placeholder="Décrivez le périmètre, les exercices concernés, les problématiques…"
                 value={formData.description}
                 onChange={e => setFormData({ ...formData, description: e.target.value })}
                 className="w-full bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-500 transition-all resize-none h-24" />
@@ -234,7 +235,7 @@ export default function ClientDashboard() {
 
             {/* Upload zone */}
             <div>
-              <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">Documents financiers</label>
+              <label htmlFor="audit-file-upload" className="block text-xs font-medium text-[var(--muted-foreground)] mb-2">Documents financiers</label>
               <div className="mb-3 bg-orange-500/10 border border-orange-500/20 rounded-xl p-4">
                 <div className="flex gap-3">
                   <AlertCircle className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
@@ -263,7 +264,7 @@ export default function ClientDashboard() {
                   Glissez vos fichiers ici ou <span className="text-blue-400 font-medium">cliquez pour sélectionner</span>
                 </p>
                 <p className="text-xs text-[var(--muted-foreground)]/60 mt-1">PDF, Excel, Word, CSV acceptés</p>
-                <input ref={fileInputRef} type="file" multiple accept=".pdf,.xlsx,.xls,.doc,.docx,.csv,.txt"
+                <input ref={fileInputRef} id="audit-file-upload" type="file" multiple accept=".pdf,.xlsx,.xls,.doc,.docx,.csv,.txt"
                   className="hidden" onChange={e => setFiles(prev => [...prev, ...Array.from(e.target.files || [])])} />
               </div>
               {files.length > 0 && (
