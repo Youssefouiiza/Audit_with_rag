@@ -252,6 +252,9 @@ export default function ClientDashboard() {
                 </div>
               </div>
               <div
+                role="button"
+                tabIndex={0}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click(); } }}
                 onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={() => setDragOver(false)}
                 onDrop={handleFileDrop}
