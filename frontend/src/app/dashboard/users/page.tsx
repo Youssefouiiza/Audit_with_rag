@@ -298,26 +298,26 @@ export default function UsersPage() {
             <form onSubmit={handleCreate} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">Email <span className="text-red-500">*</span></label>
-                  <input type="email" required placeholder="nom@audit.local"
+                  <label htmlFor="create-email" className="block text-xs font-semibold text-[var(--foreground)] mb-1">Email <span className="text-red-500">*</span></label>
+                  <input id="create-email" type="email" required placeholder="nom@audit.local"
                     value={createForm.email} onChange={e => setCreateForm({...createForm, email: e.target.value})}
                     className="w-full bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
                 </div>
                 <div className="col-span-1">
-                  <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">Nom Complet <span className="text-red-500">*</span></label>
-                  <input type="text" required placeholder="Jean Dupont"
+                  <label htmlFor="create-fullname" className="block text-xs font-semibold text-[var(--foreground)] mb-1">Nom Complet <span className="text-red-500">*</span></label>
+                  <input id="create-fullname" type="text" required placeholder="Jean Dupont"
                     value={createForm.fullName} onChange={e => setCreateForm({...createForm, fullName: e.target.value})}
                     className="w-full bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
                 </div>
                 <div className="col-span-1">
-                  <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">Téléphone</label>
-                  <input type="text" placeholder="+33 6..."
+                  <label htmlFor="create-phone" className="block text-xs font-semibold text-[var(--foreground)] mb-1">Téléphone</label>
+                  <input id="create-phone" type="text" placeholder="+33 6..."
                     value={createForm.phone} onChange={e => setCreateForm({...createForm, phone: e.target.value})}
                     className="w-full bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
                 </div>
                 <div className="col-span-1">
-                  <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">Rôle <span className="text-red-500">*</span></label>
-                  <select required value={createForm.role} onChange={e => setCreateForm({...createForm, role: e.target.value})}
+                  <label htmlFor="create-role" className="block text-xs font-semibold text-[var(--foreground)] mb-1">Rôle <span className="text-red-500">*</span></label>
+                  <select id="create-role" required value={createForm.role} onChange={e => setCreateForm({...createForm, role: e.target.value})}
                     className="w-full bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                     <option value="CLIENT">CLIENT</option>
                     <option value="AUDITOR">AUDITOR</option>
@@ -326,8 +326,8 @@ export default function UsersPage() {
                   </select>
                 </div>
                 <div className="col-span-1">
-                  <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">Mot de passe temp <span className="text-red-500">*</span></label>
-                  <input type="password" required minLength={8} placeholder="8+ caractères"
+                  <label htmlFor="create-password" className="block text-xs font-semibold text-[var(--foreground)] mb-1">Mot de passe temp <span className="text-red-500">*</span></label>
+                  <input id="create-password" type="password" required minLength={8} placeholder="8+ caractères"
                     value={createForm.temporaryPassword} onChange={e => setCreateForm({...createForm, temporaryPassword: e.target.value})}
                     className="w-full bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
                 </div>
@@ -358,20 +358,20 @@ export default function UsersPage() {
 
             <form onSubmit={handleEdit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">Nom Complet</label>
-                <input type="text" required placeholder="Jean Dupont"
+                <label htmlFor="edit-fullname" className="block text-xs font-semibold text-[var(--foreground)] mb-1">Nom Complet</label>
+                <input id="edit-fullname" type="text" required placeholder="Jean Dupont"
                   value={editForm.fullName} onChange={e => setEditForm({...editForm, fullName: e.target.value})}
                   className="w-full bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">Téléphone</label>
-                <input type="text" placeholder="+33..."
+                <label htmlFor="edit-phone" className="block text-xs font-semibold text-[var(--foreground)] mb-1">Téléphone</label>
+                <input id="edit-phone" type="text" placeholder="+33..."
                   value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})}
                   className="w-full bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">Statut</label>
-                <select value={editForm.status} onChange={e => setEditForm({...editForm, status: e.target.value})}
+                <label htmlFor="edit-status" className="block text-xs font-semibold text-[var(--foreground)] mb-1">Statut</label>
+                <select id="edit-status" value={editForm.status} onChange={e => setEditForm({...editForm, status: e.target.value})}
                   className="w-full bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] rounded-xl px-3 py-2 text-sm outline-none focus:border-blue-500">
                   <option value="ACTIVE">ACTIVE</option>
                   <option value="INACTIVE">INACTIVE</option>
