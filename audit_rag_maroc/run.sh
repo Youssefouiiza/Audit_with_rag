@@ -39,8 +39,8 @@ echo ""
 echo "📦 Vérification des dépendances..."
 if ! python -c "import streamlit" &>/dev/null; then
     echo "⬇️  Installation des dépendances (première fois, ~5 min)..."
-    pip install --upgrade pip -q
-    pip install -r requirements.txt
+    pip install --upgrade pip -q --only-binary :all:
+    pip install -r requirements.txt --only-binary :all:
     echo "✅ Dépendances installées"
 else
     echo "✅ Dépendances déjà installées"
