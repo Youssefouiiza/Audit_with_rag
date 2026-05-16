@@ -157,9 +157,9 @@ function AuditInfoSidebar({ user, audit, statusCfg, changingStatus, assigning, a
 
       {canModify && (
         <div className="pt-3 space-y-2 border-t border-[var(--border)]">
-          <label className="block text-xs font-medium text-[var(--muted-foreground)]">Changer le statut</label>
+          <label htmlFor="audit-status-select" className="block text-xs font-medium text-[var(--muted-foreground)]">Changer le statut</label>
           <div className="relative">
-            <select onChange={e => onChangeStatus(e.target.value)} defaultValue=""
+            <select id="audit-status-select" onChange={e => onChangeStatus(e.target.value)} defaultValue=""
               disabled={changingStatus}
               className="w-full appearance-none bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-500 transition-all pr-8 disabled:opacity-50">
               <option value="">Sélectionner…</option>
@@ -178,12 +178,12 @@ function AuditInfoSidebar({ user, audit, statusCfg, changingStatus, assigning, a
 
       {canAssign && (
         <div className="pt-3 space-y-2 border-t border-[var(--border)]">
-          <label className="block text-xs font-medium text-[var(--muted-foreground)]">
+          <label htmlFor="audit-auditor-select" className="block text-xs font-medium text-[var(--muted-foreground)]">
             {audit.auditorName ? 'Réassigner un auditeur' : 'Assigner un auditeur'}
           </label>
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <select onChange={e => onSetAuditor(e.target.value)} value={selectedAuditor} disabled={assigning}
+              <select id="audit-auditor-select" onChange={e => onSetAuditor(e.target.value)} value={selectedAuditor} disabled={assigning}
                 className="w-full appearance-none bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-500 transition-all pr-8 disabled:opacity-50">
                 <option value="">Sélectionner un auditeur…</option>
                 {auditors.map((a: any) => (
@@ -430,10 +430,11 @@ function ManagerReviewPanel({ user, reportRecord, reviewComment, reviewing, onSe
         )}
 
         <div>
-          <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1.5">
+          <label htmlFor="review-comment" className="block text-xs font-medium text-[var(--muted-foreground)] mb-1.5">
             Commentaire (obligatoire pour refus ou révision)
           </label>
           <textarea
+            id="review-comment"
             value={reviewComment}
             onChange={e => onSetComment(e.target.value)}
             placeholder="Ex: Le ratio d'endettement n'est pas commenté, veuillez compléter la section 5..."
