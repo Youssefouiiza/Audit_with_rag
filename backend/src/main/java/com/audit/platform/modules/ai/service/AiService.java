@@ -83,6 +83,9 @@ public class AiService {
                 Thread.sleep(3000);
                 jsonResponse = callGroq(systemPrompt, userPrompt);
             } catch (Exception e2) {
+                if (e2 instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                }
                 log.warn("Groq retry failed, trying Mistral…");
                 modelUsed = "mistral/" + appProperties.getAi().getMistral().getModel();
                 try {
