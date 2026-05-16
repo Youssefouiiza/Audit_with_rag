@@ -61,7 +61,28 @@ jobs:
         working-directory: ./audit_rag_maroc
         continue-on-error: true
 
-      # 4. Verify coverage files exist
+      # 4. Fix coverage report paths (make them relative to repo root)
+      - name: Fix Frontend coverage paths
+        run: |
+          if [ -f frontend/coverage/lcov.info ]; then
+            sed -i 's|SF:src/|SF:frontend/src/|g' frontend/coverage/lcov.info
+            echo "Fixed lcov.info paths. Sample:"
+            head -5 frontend/coverage/lcov.info
+          else
+            echo "No lcov.info found"
+          fi
+
+      - name: Fix Python coverage paths
+        run: |
+          if [ -f audit_rag_maroc/coverage.xml ]; then
+            sed -i 's|filename="|filename="audit_rag_maroc/|g' audit_rag_maroc/coverage.xml
+            echo "Fixed coverage.xml paths. Sample:"
+            head -10 audit_rag_maroc/coverage.xml
+          else
+            echo "No coverage.xml found"
+          fi
+
+      # 5. Verify coverage files exist
       - name: Debug - List coverage files
         run: |
           echo "=== Frontend coverage ==="
@@ -79,7 +100,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >
-            -Dsonar.projectKey=Youssefouiiza_New_audit
+            -Dsonar.projectKey=Youssefouiiza_Audit_with_rag
             -Dsonar.organization=youssefouiiza
             -Dsonar.javascript.lcov.reportPaths=frontend/coverage/lcov.info
             -Dsonar.python.coverage.reportPaths=audit_rag_maroc/coverage.xml
