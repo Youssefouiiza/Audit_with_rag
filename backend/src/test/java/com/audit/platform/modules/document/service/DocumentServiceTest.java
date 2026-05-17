@@ -235,8 +235,8 @@ class DocumentServiceTest {
         when(documentRequestRepository.findById(reqId)).thenReturn(Optional.of(dr));
         when(documentRequestRepository.save(any())).thenReturn(dr);
 
-        DocumentRequestResponse r = documentService.updateRequestStatus(reqId, DocumentRequestStatus.COMPLETED);
-        assertEquals(DocumentRequestStatus.COMPLETED, dr.getStatus());
+        DocumentRequestResponse r = documentService.updateRequestStatus(reqId, DocumentRequestStatus.FULFILLED);
+        assertEquals(DocumentRequestStatus.FULFILLED, dr.getStatus());
     }
 
     @Test
@@ -244,6 +244,6 @@ class DocumentServiceTest {
     void updateRequestStatus_NotFound() {
         UUID reqId = UUID.randomUUID();
         when(documentRequestRepository.findById(reqId)).thenReturn(Optional.empty());
-        assertThrows(ApiException.class, () -> documentService.updateRequestStatus(reqId, DocumentRequestStatus.COMPLETED));
+        assertThrows(ApiException.class, () -> documentService.updateRequestStatus(reqId, DocumentRequestStatus.FULFILLED));
     }
 }
